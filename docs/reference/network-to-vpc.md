@@ -424,6 +424,35 @@ IGW đứng ở rìa VPC và dịch tĩnh 1-1 giữa `52.x.x.x` ↔ `10.0.1.23`.
 - Instance không có public IP/EIP thì dù nằm trong public subnet cũng **không** ra được
   Internet: IGW không có gì để dịch.
 
+### Mapping 1:1 đó không phải suy luận — nó là state tường minh bạn tạo ra
+
+IGW không tự "đoán" máy nào ứng với IP nào. Mapping được tạo tại đúng thời điểm bạn khai,
+theo một trong hai cách:
+
+- **Public IP tự động** (`map_public_ip_on_launch = true` trên subnet): lúc EC2 launch, AWS
+  cấp một IP rảnh trong kho của region và ghi nó vào metadata của **chính ENI đó**. Mapping
+  biến mất khi instance stop/terminate — vì vậy IP loại này đổi mỗi lần restart.
+- **Elastic IP** (`aws_eip` + `allocation_id`, hoặc `aws_eip_association`): bạn tạo một
+  resource EIP riêng rồi **gắn tường minh** nó vào một ENI/private IP cụ thể. Trong
+  [network.tf](../../terraform/network/network.tf) của repo, dòng
+
+  ```hcl
+  allocation_id = aws_eip.logistic_public_ip_1a.id
+  ```
+
+  trong `aws_nat_gateway.logistic_ngw_1a` chính là hành động tạo association đó —
+  `logistic_public_ip_1a` không đi đâu khác ngoài đúng NAT Gateway này.
+
+Mỗi association là **một record độc lập** ở control plane của AWS — hình dung như một dòng
+trong bảng `eip_associations(allocation_id UNIQUE, eni_id, private_ip)`. Không phải một pool
+dùng chung rồi router "đoán": có bao nhiêu EC2/NAT đang giữ public IP thì có bấy nhiêu dòng,
+mỗi dòng trỏ đúng một đích. Đó là lý do hàng tá máy trong VPC không gây nhầm lẫn — IGW chỉ
+tra đúng dòng khớp với destination IP của packet đang tới, không phải dò tìm giữa nhiều máy.
+
+Hệ quả nói ở trên suy ra thẳng từ đây: instance không có public IP/EIP thì đơn giản là
+**không có dòng nào trong bảng đó cho nó** — không phải IGW "không biết đường vào", mà là
+không có gì để tra.
+
 ## 3.5. NAT Gateway — đường ra cho private subnet, và cái giá của nó
 
 Private subnet không có IGW, nhưng vẫn cần `apt update`, kéo image từ `ghcr.io`, gọi

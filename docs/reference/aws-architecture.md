@@ -430,6 +430,11 @@ IGW là cửa hai chiều giữa VPC và Internet, mỗi VPC một cái. Nó d�
 của chính nó ([network-to-vpc.md](network-to-vpc.md) mục 3.4). Máy không có public IP thì dù nằm
 trong public subnet cũng không ra được Internet: IGW không có gì để dịch.
 
+Mapping 1:1 đó không phải IGW tự suy luận — nó là state tường minh bạn tạo lúc khai
+`map_public_ip_on_launch` hoặc gắn `aws_eip`, mỗi association là một record độc lập ở control
+plane AWS. Cơ chế và ví dụ từ `network.tf` của repo: [network-to-vpc.md](network-to-vpc.md)
+mục 3.4, "Mapping 1:1 đó không phải suy luận".
+
 Vì sao IGW không gắn AZ và không cần lo HA: mục 2.5.
 
 ### 4.5. NAT Gateway
